@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-80kg^76yf78%iyb3%0&h%jner%zye*fz$3@tcthl+jlzt9p1l&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["blog-api-jdli.onrender.com","localhost", "0.0.0.0", "127.0.0.1"]
 
 
 # Application definition

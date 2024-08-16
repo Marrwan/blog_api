@@ -1,10 +1,10 @@
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 class Author(models.Model):
+    user = models.ForeignKey(User, related_name='authors', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     bio = models.TextField()

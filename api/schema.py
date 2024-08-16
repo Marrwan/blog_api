@@ -10,11 +10,9 @@ from graphene import relay
 
 User = get_user_model()
 
-
 class AuthorType(DjangoObjectType):
     class Meta:
         model = Author
-
 
 class PostType(DjangoObjectType):
     class Meta:
@@ -25,11 +23,9 @@ class PostType(DjangoObjectType):
             'content': ['icontains'],
         }
 
-
 class CommentType(DjangoObjectType):
     class Meta:
         model = Comment
-
 
 class Query(graphene.ObjectType):
     all_posts = DjangoFilterConnectionField(PostType, author_id=graphene.Int(), title_contains=graphene.String())
@@ -50,7 +46,6 @@ class Query(graphene.ObjectType):
     def resolve_all_comments(self, info, post_id):
         return Comment.objects.filter(post_id=post_id)
 
-
 class CreateAuthor(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
@@ -61,12 +56,14 @@ class CreateAuthor(graphene.Mutation):
     errors = graphene.List(graphene.String)
 
     def mutate(self, info, name, email, bio=None):
+        user = info.context.user
+        if not user.is_authenticated:
+            raise PermissionDenied("You must be logged in to create an author.")
         try:
-            author = create_author(name, email, bio)
+            author = create_author(name, email, bio, user.id)
             return CreateAuthor(author=author, errors=[])
         except ValidationError as e:
             return CreateAuthor(author=None, errors=[str(e)])
-
 
 class UpdateAuthor(graphene.Mutation):
     class Arguments:
@@ -79,12 +76,14 @@ class UpdateAuthor(graphene.Mutation):
     errors = graphene.List(graphene.String)
 
     def mutate(self, info, id, name=None, email=None, bio=None):
+        user = info.context.user
+        if not user.is_authenticated:
+            raise PermissionDenied("You must be logged in to update an author.")
         try:
             author = update_author(id, name, email, bio)
             return UpdateAuthor(author=author, errors=[])
         except ValidationError as e:
             return UpdateAuthor(author=None, errors=[str(e)])
-
 
 class CreatePost(graphene.Mutation):
     class Arguments:
@@ -99,7 +98,6 @@ class CreatePost(graphene.Mutation):
         user = info.context.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in to create a post.")
-
         try:
             author = Author.objects.get(pk=author_id)
             if author.user != user:
@@ -108,7 +106,6 @@ class CreatePost(graphene.Mutation):
             return CreatePost(post=post, errors=[])
         except ValidationError as e:
             return CreatePost(post=None, errors=[str(e)])
-
 
 class UpdatePost(graphene.Mutation):
     class Arguments:
@@ -123,7 +120,6 @@ class UpdatePost(graphene.Mutation):
         user = info.context.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in to update a post.")
-
         try:
             post = Post.objects.get(pk=id)
             if post.author.user != user:
@@ -132,7 +128,6 @@ class UpdatePost(graphene.Mutation):
             return UpdatePost(post=post, errors=[])
         except ValidationError as e:
             return UpdatePost(post=None, errors=[str(e)])
-
 
 class DeletePost(graphene.Mutation):
     class Arguments:
@@ -145,7 +140,6 @@ class DeletePost(graphene.Mutation):
         user = info.context.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in to delete a post.")
-
         try:
             post = Post.objects.get(pk=id)
             if post.author.user != user:
@@ -154,7 +148,6 @@ class DeletePost(graphene.Mutation):
             return DeletePost(success=success, errors=[])
         except ValidationError as e:
             return DeletePost(success=False, errors=[str(e)])
-
 
 class CreateComment(graphene.Mutation):
     class Arguments:
@@ -168,13 +161,11 @@ class CreateComment(graphene.Mutation):
         user = info.context.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in to create a comment.")
-
         try:
             comment = create_comment(content, post_id)
             return CreateComment(comment=comment, errors=[])
         except ValidationError as e:
             return CreateComment(comment=None, errors=[str(e)])
-
 
 class Mutation(graphene.ObjectType):
     create_author = CreateAuthor.Field()
@@ -186,6 +177,5 @@ class Mutation(graphene.ObjectType):
     token_auth = graphql_jwt.ObtainJSONWebToken.Field()
     verify_token = graphql_jwt.Verify.Field()
     refresh_token = graphql_jwt.Refresh.Field()
-
 
 schema = graphene.Schema(query=Query, mutation=Mutation)

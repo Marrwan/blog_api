@@ -56,6 +56,57 @@ python manage.py runserver
 Open your browser and navigate to `http://127.0.0.1:8000/graphql/` to access the GraphQL playground.
 
 ## GraphQL Queries and Mutations
+A. First Create a user
+```bash
+python manage.py create_user.py
+```
+You'll, get a reply like this:
+```shell
+User 'Abdulbasit' created successfully.
+Username: Abdulbasit, password: marrwanah12
+```
+B. After that, Login using the below query:
+```shell
+mutation {
+  tokenAuth(username: "Abdulbasit", password: "marrwanah12") {
+    token
+    payload
+    refreshExpiresIn
+  }
+}
+```
+You'll get a reply that looks lke this:
+```json
+{
+  "data": {
+    "tokenAuth": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkFiZHVsYmFzaXQiLCJleHAiOjE3MjM5MDM4OTgsIm9yaWdJYXQiOjE3MjM4MTc0OTh9.RcLCT_fdKdiMt2c59eLvctsmTqiJChvcdJTqF3LSGjE",
+      "payload": {
+        "username": "Abdulbasit",
+        "exp": 1723903898,
+        "origIat": 1723817498
+      },
+      "refreshExpiresIn": 1724422298
+    }
+  }
+}
+```
+
+C. Copy the token:
+    In GraphQL Playground, you can set HTTP headers for authentication. Follow these steps:
+
+    1. Open GraphQL Playground.
+
+    2. Click on the "HTTP HEADERS" button at the bottom left.
+
+    3. Add the Authorization header with the value Bearer YOUR_ACCESS_TOKEN.
+like this
+```shell
+{
+  "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+}
+Continue
+```
 1. Create an Author
 ```shell
 mutation {
@@ -129,7 +180,7 @@ mutation {
 6. Create a Comment
 ```graphql
 mutation {
-  createComment(content: "This is a comment.", postId: 1) {
+  createComment(content: "This is a comment.", postId: 2) {
     comment {
       id
       content
@@ -168,7 +219,7 @@ mutation {
 8. Query a Single Post
 ```graphql
 {
-  post(id: 1) {
+  post(id: 2) {
     id
     title
     content
@@ -186,7 +237,7 @@ mutation {
 9. Query All Comments for a Post
 ```graphql
 {
-  allComments(postId: 1) {
+  allComments(postId: 2) {
     id
     content
     createdAt
@@ -196,6 +247,7 @@ mutation {
     }
   }
 }
+
 ```
 ## Running Tests
 ### Prerequisites

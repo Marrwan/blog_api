@@ -3,24 +3,21 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from .models import Author, Post, Comment
 from .services import create_author, update_author, create_post, update_post, delete_post, create_comment
 from django.contrib.auth.models import User
-from django.test import TestCase
 from graphene_django.utils.testing import graphql_query
-from django.contrib.auth import get_user_model
 
-# User = get_user_model()
 class BlogApiTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='12345')
-        self.author = create_author(name="John Doe", email="john@example.com", bio="Author bio.")
+        self.author = create_author(name="John Doe", email="john@example.com", bio="Author bio.", user_id=self.user.id)
 
     def test_create_author(self):
-        author = create_author(name="Jane Doe", email="jane@example.com", bio="Another bio.")
+        author = create_author(name="Jane Doe", email="jane@example.com", bio="Another bio.", user_id=self.user.id)
         self.assertEqual(author.name, "Jane Doe")
         self.assertEqual(author.email, "jane@example.com")
 
     def test_create_duplicate_author_email(self):
         with self.assertRaises(ValidationError):
-            create_author(name="John Doe", email="john@example.com", bio="Duplicate email.")
+            create_author(name="John Doe", email="john@example.com", bio="Duplicate email.", user_id=self.user.id)
 
     def test_update_author(self):
         updated_author = update_author(id=self.author.id, name="John Updated", email="johnupdated@example.com")
@@ -65,164 +62,156 @@ class BlogAPIQueryTest(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", password="testpassword")
-        self.author = Author.objects.create(name="John Doe", email="john@example.com", bio="A passionate writer.")
+        self.author = Author.objects.create(name="John Doe", email="john@example.com", bio="A passionate writer.", user=self.user)
         self.client.login(username="testuser", password="testpassword")
 
-    def test_create_author(self):
+    def graphql_query(self, query):
         response = self.client.post(
             '/graphql/',
-            data={
-                'query': '''
-                       mutation {
-                         createAuthor(name: "Jane Doe", email: "jane@example.com", bio: "Another writer.") {
-                           author {
-                             id
-                             name
-                             email
-                             bio
-                           }
-                           errors
-                         }
-                       }
-                       '''
-            },
+            data={'query': query},
             content_type='application/json'
         )
-        content = response.json()
+        return response.json()
+
+    def test_create_author(self):
+        query = '''
+            mutation {
+                createAuthor(name: "Jane Doe", email: "jane@example.com", bio: "Another writer.") {
+                    author {
+                        id
+                        name
+                        email
+                        bio
+                    }
+                    errors
+                }
+            }
+        '''
+        content = self.graphql_query(query)
         self.assertIsNone(content.get("errors"))
         self.assertEqual(content["data"]["createAuthor"]["author"]["name"], "Jane Doe")
 
+    def test_create_post(self):
+        query = '''
+            mutation {
+                createPost(title: "New Post", content: "This is a new post.", authorId: %d) {
+                    post {
+                        id
+                        title
+                        content
+                        author {
+                            id
+                            name
+                        }
+                    }
+                    errors
+                }
+            }
+        ''' % self.author.id
+        content = self.graphql_query(query)
+        self.assertIsNone(content.get("errors"))
+        self.assertEqual(content["data"]["createPost"]["post"]["title"], "New Post")
 
-    # def test_update_post(self):
-    #     post = Post.objects.create(title="Old Post", content="Old content.", author=self.author)
-    #     response = self.client.post(
-    #         '/graphql/',
-    #         data={
-    #             'query': '''
-    #                 mutation {
-    #                   updatePost(id: "%s", title: "Updated Post", content: "Updated content.") {
-    #                     post {
-    #                       id
-    #                       title
-    #                       content
-    #                     }
-    #                     errors
-    #                   }
-    #                 }
-    #             ''' % post.id
-    #         },
-    #         content_type='application/json'
-    #     )
-    #     content = response.json()
-    #     self.assertIsNone(content.get("errors"))
-    #     self.assertEqual(content["data"]["updatePost"]["post"]["title"], "Updated Post")
+    def test_update_post(self):
+        post = Post.objects.create(title="Old Post", content="Old content.", author=self.author)
+        query = '''
+            mutation {
+                updatePost(id: "%s", title: "Updated Post", content: "Updated content.") {
+                    post {
+                        id
+                        title
+                        content
+                    }
+                    errors
+                }
+            }
+        ''' % post.id
+        content = self.graphql_query(query)
+        self.assertIsNone(content.get("errors"))
+        self.assertEqual(content["data"]["updatePost"]["post"]["title"], "Updated Post")
 
-    # def test_delete_post(self):
-    #     post = Post.objects.create(title="Post to Delete", content="This post will be deleted.", author=self.author)
-    #     response = self.client.post(
-    #         '/graphql/',
-    #         data={
-    #             'query': '''
-    #                 mutation {
-    #                   deletePost(id: "%s") {
-    #                     success
-    #                     errors
-    #                   }
-    #                 }
-    #             ''' % post.id
-    #         },
-    #         content_type='application/json'
-    #     )
-    #     content = response.json()
-    #     self.assertIsNone(content.get("errors"))
-    #     self.assertTrue(content["data"]["deletePost"]["success"])
+    def test_delete_post(self):
+        post = Post.objects.create(title="Post to Delete", content="This post will be deleted.", author=self.author)
+        query = '''
+            mutation {
+                deletePost(id: "%s") {
+                    success
+                    errors
+                }
+            }
+        ''' % post.id
+        content = self.graphql_query(query)
+        self.assertIsNone(content.get("errors"))
+        self.assertTrue(content["data"]["deletePost"]["success"])
 
-    # def test_create_comment(self):
-    #     post = Post.objects.create(title="Post with Comments", content="This post will have comments.", author=self.author)
-    #     response = self.client.post(
-    #         '/graphql/',
-    #         data={
-    #             'query': '''
-    #                 mutation {
-    #                   createComment(content: "This is a comment.", postId: %d) {
-    #                     comment {
-    #                       id
-    #                       content
-    #                       post {
-    #                         id
-    #                         title
-    #                       }
-    #                     }
-    #                     errors
-    #                   }
-    #                 }
-    #             ''' % post.id
-    #         },
-    #         content_type='application/json'
-    #     )
-    #     content = response.json()
-    #     self.assertIsNone(content.get("errors"))
-    #     self.assertEqual(content["data"]["createComment"]["comment"]["content"], "This is a comment.")
+    def test_create_comment(self):
+        post = Post.objects.create(title="Post with Comments", content="This post will have comments.", author=self.author)
+        query = '''
+            mutation {
+                createComment(content: "This is a comment.", postId: %d) {
+                    comment {
+                        id
+                        content
+                        post {
+                            id
+                            title
+                        }
+                    }
+                    errors
+                }
+            }
+        ''' % post.id
+        content = self.graphql_query(query)
+        self.assertIsNone(content.get("errors"))
+        self.assertEqual(content["data"]["createComment"]["comment"]["content"], "This is a comment.")
 
     def test_query_all_posts(self):
         Post.objects.create(title="First Post", content="First post content.", author=self.author)
         Post.objects.create(title="Second Post", content="Second post content.", author=self.author)
-        response = self.client.post(
-            '/graphql/',
-            data={
-                'query': '''
-                    {
-                      allPosts(authorId: %d) {
-                        edges {
-                          node {
+        query = '''
+            {
+                allPosts(authorId: %d) {
+                    edges {
+                        node {
                             id
                             title
                             content
                             author {
-                              id
-                              name
+                                id
+                                name
                             }
                             comments {
-                              id
-                              content
+                                id
+                                content
                             }
-                          }
                         }
-                      }
                     }
-                ''' % self.author.id
-            },
-            content_type='application/json'
-        )
-        content = response.json()
+                }
+            }
+        ''' % self.author.id
+        content = self.graphql_query(query)
         self.assertIsNone(content.get("errors"))
         self.assertEqual(len(content["data"]["allPosts"]["edges"]), 2)
 
     def test_query_single_post(self):
         post = Post.objects.create(title="Single Post", content="Single post content.", author=self.author)
-        response = self.client.post(
-            '/graphql/',
-            data={
-                'query': '''
-                    {
-                      post(id: %d) {
+        query = '''
+            {
+                post(id: %d) {
+                    id
+                    title
+                    content
+                    author {
                         id
-                        title
-                        content
-                        author {
-                          id
-                          name
-                        }
-                        comments {
-                          id
-                          content
-                        }
-                      }
+                        name
                     }
-                ''' % post.id
-            },
-            content_type='application/json'
-        )
-        content = response.json()
+                    comments {
+                        id
+                        content
+                    }
+                }
+            }
+        ''' % post.id
+        content = self.graphql_query(query)
         self.assertIsNone(content.get("errors"))
         self.assertEqual(content["data"]["post"]["title"], "Single Post")

@@ -7,15 +7,19 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-def create_author(name, email, bio=None):
+def create_author(name, email, bio=None, user_id=None):
     if Author.objects.filter(email=email).exists():
         raise ValidationError("An author with this email already exists.")
     try:
-        author = Author(name=name, email=email, bio=bio)
+        user = User.objects.get(pk=user_id) if user_id else None
+        author = Author(name=name, email=email, bio=bio, user=user)
         author.save()
         return author
+    except User.DoesNotExist:
+        raise ValidationError("User not found.")
     except IntegrityError as e:
         raise ValidationError(f"Error creating author: {e}")
+
 
 def update_author(id, name=None, email=None, bio=None):
     try:
